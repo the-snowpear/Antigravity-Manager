@@ -1381,10 +1381,19 @@ pub async fn handle_messages(
                             .chain(stream_rest.map(|result| -> Result<Bytes, std::io::Error> {
                                 match result {
                                     Ok(b) => Ok(b),
-                                    Err(e) => Ok(Bytes::from(format!(
-                                        "data: {{\"error\":\"{}\"}}\n\n",
-                                        e
-                                    ))),
+                                    Err(e) => {
+                                        let error_json = serde_json::json!({
+                                            "type": "error",
+                                            "error": {
+                                                "type": "api_error",
+                                                "message": format!("Stream error: {}", e)
+                                            }
+                                        });
+                                        Ok(Bytes::from(format!(
+                                            "event: error\ndata: {}\n\n",
+                                            error_json
+                                        )))
+                                    }
                                 }
                             }));
 
@@ -1397,7 +1406,17 @@ pub async fn handle_messages(
                                     Ok(None) => break,
                                     Err(_) => {
                                         tracing::error!("[Claude-SSE] Idle timeout after 300s, terminating stream");
-                                        yield Ok::<Bytes, std::io::Error>(Bytes::from("data: {\"type\": \"message_stop\"}\n\ndata: [DONE]\n\n"));
+                                        let error_json = serde_json::json!({
+                                            "type": "error",
+                                            "error": {
+                                                "type": "api_error",
+                                                "message": "Stream idle timeout after 300s"
+                                            }
+                                        });
+                                        yield Ok::<Bytes, std::io::Error>(Bytes::from(format!(
+                                            "event: error\ndata: {}\n\n",
+                                            error_json
+                                        )));
                                         break;
                                     }
                                 }

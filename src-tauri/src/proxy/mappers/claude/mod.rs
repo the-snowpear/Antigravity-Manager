@@ -56,6 +56,7 @@ where
         state.set_client_adapter(client_adapter); // [NEW] Set adapter
         state.set_registered_tool_names(registered_tool_names); // [FIX #MCP] Set tool names
         let mut buffer = BytesMut::new();
+        let mut has_fatal_error = false;
 
         loop {
             // [NEW] 60秒心跳保活: 延长超时时间以增加网络抖动容错
@@ -89,11 +90,15 @@ where
                             let error_json = serde_json::json!({
                                 "type": "error",
                                 "error": {
-                                    "type": "overloaded_error",
+                                    "type": "api_error",
                                     "message": format!("Stream error: {}", e)
                                 }
                             });
-                            yield Ok(state.emit("error", error_json));
+                            yield Ok(Bytes::from(format!(
+                                "event: error\ndata: {}\n\n",
+                                error_json
+                            )));
+                            has_fatal_error = true;
                             break;
                         }
                     }
@@ -104,6 +109,10 @@ where
                     yield Ok(Bytes::from(": ping\n\n"));
                 }
             }
+        }
+
+        if has_fatal_error {
+            return;
         }
 
         // [FIX #1732] Mandatory Flush remaining buffer on stream termination
@@ -589,5 +598,240 @@ mod tests {
         // 必须包含模拟的 Usage
         assert!(output.contains("\"usage\":"));
         assert!(output.contains("\"output_tokens\":100")); // Should contain the recovery usage
+    }
+
+    /// 测试 A: 正常流 - 断言最后仍然包含 event: message_stop
+    #[tokio::test]
+    async fn test_claude_sse_stream_normal_completion() {
+        use futures::StreamExt;
+
+        let mock_stream = async_stream::stream! {
+            let chunk1 = serde_json::json!({
+                "candidates": [{
+                    "content": {
+                        "parts": [{ "text": "Hello world" }]
+                    }
+                }],
+                "modelVersion": "gemini-2.5-pro",
+                "responseId": "msg_normal_1"
+            });
+            yield Ok::<_, String>(bytes::Bytes::from(format!("data: {}\n\n", chunk1)));
+
+            let chunk_done = serde_json::json!({
+                "candidates": [{
+                    "content": {
+                        "parts": [{ "text": "" }]
+                    },
+                    "finishReason": "STOP"
+                }],
+                "usageMetadata": {
+                    "promptTokenCount": 15,
+                    "candidatesTokenCount": 5,
+                    "totalTokenCount": 20
+                },
+                "modelVersion": "gemini-2.5-pro",
+                "responseId": "msg_normal_2"
+            });
+            yield Ok::<_, String>(bytes::Bytes::from(format!("data: {}\n\n", chunk_done)));
+        };
+
+        let mut claude_stream = create_claude_sse_stream(
+            Box::pin(mock_stream),
+            "trace_normal".to_string(),
+            "test@example.com".to_string(),
+            None,
+            false,
+            100_000,
+            None,
+            1,
+            None,
+            Vec::new(),
+        );
+
+        let mut chunks = Vec::new();
+        while let Some(result) = claude_stream.next().await {
+            let bytes = result.expect("Stream chunk should be Ok");
+            chunks.push(String::from_utf8(bytes.to_vec()).unwrap());
+        }
+        let full_output = chunks.join("");
+
+        // 断言包含标准生命周期事件
+        assert!(full_output.contains("event: message_start\n"));
+        assert!(full_output.contains("event: content_block_start\n"));
+        assert!(full_output.contains("event: content_block_delta\n"));
+        assert!(full_output.contains("event: content_block_stop\n"));
+        assert!(full_output.contains("event: message_delta\n"));
+        assert!(full_output.contains("event: message_stop\n"));
+        assert!(full_output.contains("data: {\"type\":\"message_stop\"}\n\n"));
+    }
+
+    /// 测试 B: 上游流读取/解析错误 - 断言包含 event: error 且 JSON 顶层 type == "error", error.type, error.message
+    #[tokio::test]
+    async fn test_claude_sse_stream_upstream_error_format() {
+        use futures::StreamExt;
+
+        let mock_stream = async_stream::stream! {
+            yield Err::<bytes::Bytes, String>("upstream connection reset by peer".to_string());
+        };
+
+        let mut claude_stream = create_claude_sse_stream(
+            Box::pin(mock_stream),
+            "trace_error".to_string(),
+            "test@example.com".to_string(),
+            None,
+            false,
+            100_000,
+            None,
+            1,
+            None,
+            Vec::new(),
+        );
+
+        let mut chunks = Vec::new();
+        while let Some(result) = claude_stream.next().await {
+            let bytes = result.expect("Stream chunk should be Ok");
+            chunks.push(String::from_utf8(bytes.to_vec()).unwrap());
+        }
+        let full_output = chunks.join("");
+
+        // 断言包含标准 Anthropic SSE error event
+        assert!(full_output.starts_with("event: error\n"), "Output should start with 'event: error'");
+        assert!(full_output.contains("data: "), "Output should contain 'data: '");
+
+        // 提取并解析 data JSON
+        let data_line = full_output
+            .lines()
+            .find(|l| l.starts_with("data: "))
+            .expect("Should have data line");
+        let json_str = data_line.strip_prefix("data: ").unwrap().trim();
+        let parsed: serde_json::Value = serde_json::from_str(json_str).expect("data must be valid JSON");
+
+        // 验证 Anthropic error envelope 结构
+        assert_eq!(parsed.get("type").and_then(|v| v.as_str()), Some("error"));
+        let error_obj = parsed.get("error").expect("Must have 'error' object");
+        assert_eq!(error_obj.get("type").and_then(|v| v.as_str()), Some("api_error"));
+        let message = error_obj.get("message").and_then(|v| v.as_str()).expect("Must have 'message'");
+        assert!(message.contains("upstream connection reset by peer"));
+    }
+
+    /// 测试 C: fatal error 后没有 message_stop 或 message_delta
+    #[tokio::test]
+    async fn test_claude_sse_stream_fatal_error_no_message_stop() {
+        use futures::StreamExt;
+
+        let mock_stream = async_stream::stream! {
+            let chunk1 = serde_json::json!({
+                "candidates": [{
+                    "content": {
+                        "parts": [{ "text": "Partial text before error" }]
+                    }
+                }],
+                "modelVersion": "gemini-2.5-pro",
+                "responseId": "msg_fatal_1"
+            });
+            yield Ok::<_, String>(bytes::Bytes::from(format!("data: {}\n\n", chunk1)));
+
+            // 突然发生 Fatal stream error
+            yield Err::<bytes::Bytes, String>("abrupt stream disconnection".to_string());
+        };
+
+        let mut claude_stream = create_claude_sse_stream(
+            Box::pin(mock_stream),
+            "trace_fatal".to_string(),
+            "test@example.com".to_string(),
+            None,
+            false,
+            100_000,
+            None,
+            1,
+            None,
+            Vec::new(),
+        );
+
+        let mut chunks = Vec::new();
+        while let Some(result) = claude_stream.next().await {
+            let bytes = result.expect("Stream chunk should be Ok");
+            chunks.push(String::from_utf8(bytes.to_vec()).unwrap());
+        }
+        let full_output = chunks.join("");
+
+        // 验证输出了正常内容且之后输出了 event: error
+        assert!(full_output.contains("event: message_start\n"));
+        assert!(full_output.contains("Partial text before error"));
+        assert!(full_output.contains("event: error\n"));
+
+        // 验证在 event: error 之后绝不能出现 message_stop 或 message_delta
+        let error_pos = full_output.find("event: error\n").expect("Must contain event: error");
+        let after_error = &full_output[error_pos..];
+
+        assert!(!after_error.contains("event: message_stop"), "Must not emit message_stop after error");
+        assert!(!after_error.contains("event: message_delta"), "Must not emit message_delta after error");
+        assert!(!after_error.contains("\"type\":\"message_stop\""), "Must not contain message_stop JSON after error");
+    }
+
+    /// 测试 D: 模拟 OMP iterateAnthropicEvents 客户端解析
+    #[tokio::test]
+    async fn test_claude_sse_stream_omp_client_parsing() {
+        use futures::StreamExt;
+
+        let mock_stream = async_stream::stream! {
+            yield Err::<bytes::Bytes, String>("upstream timeout".to_string());
+        };
+
+        let mut claude_stream = create_claude_sse_stream(
+            Box::pin(mock_stream),
+            "trace_omp".to_string(),
+            "test@example.com".to_string(),
+            None,
+            false,
+            100_000,
+            None,
+            1,
+            None,
+            Vec::new(),
+        );
+
+        let mut chunks = Vec::new();
+        while let Some(result) = claude_stream.next().await {
+            let bytes = result.expect("Stream chunk should be Ok");
+            chunks.push(String::from_utf8(bytes.to_vec()).unwrap());
+        }
+        let full_output = chunks.join("");
+
+        // 模拟 OMP iterateAnthropicEvents 的逐帧解析逻辑
+        let mut caught_omp_error: Option<String> = None;
+        let mut saw_message_stop = false;
+
+        // 简化的 SSE 帧提取器
+        let frames: Vec<&str> = full_output.split("\n\n").filter(|s| !s.trim().is_empty()).collect();
+        for frame in frames {
+            let mut event_name: Option<&str> = None;
+            let mut data_str: Option<&str> = None;
+
+            for line in frame.lines() {
+                if let Some(ev) = line.strip_prefix("event: ") {
+                    event_name = Some(ev.trim());
+                } else if let Some(d) = line.strip_prefix("data: ") {
+                    data_str = Some(d.trim());
+                }
+            }
+
+            // OMP 核心逻辑:
+            // if (sse.event === "error") { throw createAnthropicSseStreamError(sse.data); }
+            if event_name == Some("error") {
+                if let Some(data) = data_str {
+                    let parsed: serde_json::Value = serde_json::from_str(data).unwrap();
+                    let msg = parsed.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str());
+                    caught_omp_error = msg.map(|s| s.to_string());
+                }
+            } else if event_name == Some("message_stop") {
+                saw_message_stop = true;
+            }
+        }
+
+        // 验证 OMP 能够识别出错误，且没有收到 message_stop
+        assert!(caught_omp_error.is_some(), "OMP parser should have caught the stream error");
+        assert!(caught_omp_error.unwrap().contains("upstream timeout"));
+        assert!(!saw_message_stop, "OMP parser should not see message_stop on stream failure");
     }
 }
