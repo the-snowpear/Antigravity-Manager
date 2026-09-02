@@ -1739,7 +1739,10 @@ mod tests {
         clean_json_schema(&mut schema1);
 
         assert_eq!(schema1["properties"]["action_type"]["type"], "string");
-        assert_eq!(schema1["properties"]["action_type"]["enum"], json!(["element"]));
+        assert_eq!(
+            schema1["properties"]["action_type"]["enum"],
+            json!(["element"])
+        );
         assert!(schema1["properties"]["action_type"].get("const").is_none());
 
         assert_eq!(schema1["properties"]["count"]["type"], "integer");

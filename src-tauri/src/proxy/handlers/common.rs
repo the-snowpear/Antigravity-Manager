@@ -225,16 +225,13 @@ mod tests {
             let mut retry_same_account = false;
             let mut sends = Vec::new();
 
-            while let Some(attempt) = next_rotation_attempt(
-                &mut used_attempts,
-                account_count,
-                retry_same_account,
-            ) {
+            while let Some(attempt) =
+                next_rotation_attempt(&mut used_attempts, account_count, retry_same_account)
+            {
                 retry_same_account = false;
                 sends.push(attempt);
                 let account_id = format!("account-{}", attempt);
-                let strategy =
-                    state.determine_strategy(&account_id, 429, body, None, false);
+                let strategy = state.determine_strategy(&account_id, 429, body, None, false);
                 if matches!(strategy, RetryStrategy::GraceRetry(_)) {
                     assert!(!should_rotate_account(429, Some(&strategy)));
                     retry_same_account = true;

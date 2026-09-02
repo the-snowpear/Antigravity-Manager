@@ -1546,11 +1546,13 @@ mod tests {
         };
 
         // Set passthrough mode so user-specified budget is retained
-        crate::proxy::config::update_thinking_budget_config(crate::proxy::config::ThinkingBudgetConfig {
-            mode: crate::proxy::config::ThinkingBudgetMode::Passthrough,
-            custom_value: 16000,
-            effort: None,
-        });
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig {
+                mode: crate::proxy::config::ThinkingBudgetMode::Passthrough,
+                custom_value: 16000,
+                effort: None,
+            },
+        );
 
         // Pass explicit gemini-3-pro-preview which doesn't have "-thinking" suffix
         let (result, _sid, _msg_count, _) =
@@ -1570,7 +1572,9 @@ mod tests {
         assert_eq!(budget, 16000);
 
         // Restore default Auto mode
-        crate::proxy::config::update_thinking_budget_config(crate::proxy::config::ThinkingBudgetConfig::default());
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig::default(),
+        );
     }
     #[test]
     fn test_gemini_3_pro_image_not_thinking() {
@@ -1927,7 +1931,8 @@ mod tests {
         });
 
         let request: OpenAIRequest = serde_json::from_value(raw_json).unwrap();
-        let (res_val, _sid, _msg_count, _) = transform_openai_request(&request, "test-v", "gemini-2.5-flash", None);
+        let (res_val, _sid, _msg_count, _) =
+            transform_openai_request(&request, "test-v", "gemini-2.5-flash", None);
         let gen_config = &res_val["request"]["generationConfig"];
         assert_eq!(gen_config["responseMimeType"], "application/json");
         assert!(gen_config.get("responseSchema").is_some());

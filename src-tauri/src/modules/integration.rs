@@ -408,10 +408,7 @@ fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), Strin
 
     // 同步写入 ~/.gemini/ 目录下的文件凭据，兼容 SSH 会话、容器环境和无 Keyring/D-Bus 场景
     if let Err(e) = write_to_file_credentials(account) {
-        crate::modules::logger::log_warn(&format!(
-            "[Desktop] File credential sync warning: {}",
-            e
-        ));
+        crate::modules::logger::log_warn(&format!("[Desktop] File credential sync warning: {}", e));
     }
 
     Ok(())
@@ -497,7 +494,8 @@ fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), Str
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&accounts_path, std::fs::Permissions::from_mode(0o600));
+            let _ =
+                std::fs::set_permissions(&accounts_path, std::fs::Permissions::from_mode(0o600));
         }
     }
 
@@ -533,7 +531,9 @@ pub fn read_from_system_keyring() -> Result<crate::modules::migration::ImportedO
         let secret_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let payload_str = if secret_str.starts_with("go-keyring-base64:") {
             let b64_part = &secret_str["go-keyring-base64:".len()..];
-            let decoded = STANDARD.decode(b64_part).map_err(|e| format!("Base64 decode failed: {}", e))?;
+            let decoded = STANDARD
+                .decode(b64_part)
+                .map_err(|e| format!("Base64 decode failed: {}", e))?;
             String::from_utf8(decoded).map_err(|e| format!("UTF-8 decode failed: {}", e))?
         } else {
             secret_str
@@ -608,13 +608,7 @@ pub fn read_from_system_keyring() -> Result<crate::modules::migration::ImportedO
     #[cfg(target_os = "linux")]
     {
         let output = Command::new("secret-tool")
-            .args([
-                "lookup",
-                "service",
-                "gemini",
-                "username",
-                "antigravity",
-            ])
+            .args(["lookup", "service", "gemini", "username", "antigravity"])
             .output()
             .map_err(|e| format!("Failed to execute secret-tool: {}", e))?;
 
@@ -632,7 +626,9 @@ pub fn read_from_system_keyring() -> Result<crate::modules::migration::ImportedO
     }
 }
 
-fn parse_keyring_payload(payload_str: &str) -> Result<crate::modules::migration::ImportedOAuthState, String> {
+fn parse_keyring_payload(
+    payload_str: &str,
+) -> Result<crate::modules::migration::ImportedOAuthState, String> {
     let json: serde_json::Value = serde_json::from_str(payload_str)
         .map_err(|e| format!("Failed to parse keyring payload JSON: {}", e))?;
 

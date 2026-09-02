@@ -440,14 +440,18 @@ mod tests {
         fs::write(&account_path, &raw).unwrap();
 
         // Load account should successfully self-heal and return valid Account
-        let loaded = load_account_at_path(&account_path).expect("Should self-heal trailing characters");
+        let loaded =
+            load_account_at_path(&account_path).expect("Should self-heal trailing characters");
         assert_eq!(loaded.id, "corrupt-tail-acc");
         assert_eq!(loaded.email, "tail@example.com");
 
         // Verify the file was cleaned and re-written as valid JSON
         let healed_raw = fs::read_to_string(&account_path).unwrap();
         let regular_parse: Result<Account, _> = serde_json::from_str(&healed_raw);
-        assert!(regular_parse.is_ok(), "Healed file should be standard valid JSON");
+        assert!(
+            regular_parse.is_ok(),
+            "Healed file should be standard valid JSON"
+        );
     }
 
     #[test]
@@ -729,7 +733,10 @@ fn load_account_at_path(account_path: &PathBuf) -> Result<Account, String> {
         Err(e) => {
             let err_msg = e.to_string();
             // Self-healing attempt: handle trailing characters / extra closing brackets
-            if err_msg.contains("trailing characters") || err_msg.contains("trailing comma") || err_msg.contains("trailing") {
+            if err_msg.contains("trailing characters")
+                || err_msg.contains("trailing comma")
+                || err_msg.contains("trailing")
+            {
                 let mut de = serde_json::Deserializer::from_str(&content);
                 if let Ok(account) = serde::Deserialize::deserialize(&mut de) {
                     crate::modules::logger::log_warn(&format!(

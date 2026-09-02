@@ -169,10 +169,7 @@ pub fn try_parse_image_config_with_params(
 ) -> Result<(Value, String), String> {
     let image_size = normalize_image_size(image_size)?;
     Ok(parse_image_config_with_normalized_params(
-        model_name,
-        size,
-        quality,
-        image_size,
+        model_name, size, quality, image_size,
     ))
 }
 
@@ -1001,13 +998,9 @@ mod tests {
             assert_eq!(fallback["imageSize"], "4K");
         }
 
-        let (upstream_default, _) = try_parse_image_config_with_params(
-            "gemini-3.1-flash-image",
-            None,
-            Some("auto"),
-            None,
-        )
-        .expect("auto without suffix uses upstream default");
+        let (upstream_default, _) =
+            try_parse_image_config_with_params("gemini-3.1-flash-image", None, Some("auto"), None)
+                .expect("auto without suffix uses upstream default");
         assert!(upstream_default.get("imageSize").is_none());
 
         assert!(try_parse_image_config_with_params(

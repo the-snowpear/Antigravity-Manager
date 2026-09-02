@@ -3262,10 +3262,7 @@ mod tests {
             !has_google_search,
             "v1internal should avoid mixed Google Search when functionDeclarations present"
         );
-        assert!(
-            has_functions,
-            "Should have function declarations"
-        );
+        assert!(has_functions, "Should have function declarations");
     }
 
     #[test]
@@ -3347,11 +3344,15 @@ mod tests {
     fn test_model_keeps_thinking_without_signature() {
         assert!(model_keeps_thinking_without_signature("gemini-3-flash"));
         assert!(model_keeps_thinking_without_signature("gemini-3.1-flash"));
-        assert!(model_keeps_thinking_without_signature("gemini-3.7-flash-high"));
+        assert!(model_keeps_thinking_without_signature(
+            "gemini-3.7-flash-high"
+        ));
         assert!(model_keeps_thinking_without_signature(
             "gemini-3.6-flash-medium"
         ));
-        assert!(model_keeps_thinking_without_signature("gemini-3.5-flash-low"));
+        assert!(model_keeps_thinking_without_signature(
+            "gemini-3.5-flash-low"
+        ));
         assert!(model_keeps_thinking_without_signature("gemini-pro-agent"));
         assert!(!model_keeps_thinking_without_signature("gemini-3.1-pro"));
         assert!(!model_keeps_thinking_without_signature(

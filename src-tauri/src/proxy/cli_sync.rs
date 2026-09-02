@@ -226,7 +226,7 @@ impl CliApp {
                         path: codex_dir.join("config.toml"),
                     },
                 ]
-            },
+            }
             CliApp::Gemini => vec![
                 CliConfigFile {
                     name: ".env".to_string(),

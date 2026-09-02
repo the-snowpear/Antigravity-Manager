@@ -786,7 +786,10 @@ pub fn wrap_request_v2(
         // 2. snake_case
         if let Some(tool_config_snake) = inner_request.get_mut("tool_config") {
             if let Some(obj) = tool_config_snake.as_object_mut() {
-                obj.insert("include_server_side_tool_invocations".to_string(), json!(true));
+                obj.insert(
+                    "include_server_side_tool_invocations".to_string(),
+                    json!(true),
+                );
             }
         } else {
             inner_request["tool_config"] = json!({

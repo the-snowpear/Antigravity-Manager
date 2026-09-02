@@ -1757,21 +1757,45 @@ impl TokenManager {
                                                 // 内存已更新完毕，将磁盘持久化 spawn 到 blocking 线程池
                                                 {
                                                     let write_path = token.account_path.clone();
-                                                    let access_token = token_response.access_token.clone();
+                                                    let access_token =
+                                                        token_response.access_token.clone();
                                                     let expires_in = token_response.expires_in;
                                                     let id_token = token_response.id_token.clone();
-                                                    let new_rt = token_response.refresh_token.clone();
+                                                    let new_rt =
+                                                        token_response.refresh_token.clone();
                                                     let write_ts = now + token_response.expires_in;
                                                     tokio::task::spawn_blocking(move || {
                                                         let Ok(_lk) = crate::modules::account::lock_account_file_updates() else { return; };
-                                                        let Ok(raw) = std::fs::read_to_string(&write_path) else { return; };
-                                                        let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&raw) else { return; };
-                                                        val["token"]["access_token"] = access_token.into();
-                                                        val["token"]["expires_in"] = expires_in.into();
-                                                        val["token"]["expiry_timestamp"] = write_ts.into();
-                                                        if let Some(it) = id_token { val["token"]["id_token"] = it.into(); }
-                                                        if let Some(rt) = new_rt { val["token"]["refresh_token"] = rt.into(); }
-                                                        if let Ok(s) = serde_json::to_string_pretty(&val) { let _ = std::fs::write(&write_path, s); }
+                                                        let Ok(raw) =
+                                                            std::fs::read_to_string(&write_path)
+                                                        else {
+                                                            return;
+                                                        };
+                                                        let Ok(mut val) = serde_json::from_str::<
+                                                            serde_json::Value,
+                                                        >(
+                                                            &raw
+                                                        ) else {
+                                                            return;
+                                                        };
+                                                        val["token"]["access_token"] =
+                                                            access_token.into();
+                                                        val["token"]["expires_in"] =
+                                                            expires_in.into();
+                                                        val["token"]["expiry_timestamp"] =
+                                                            write_ts.into();
+                                                        if let Some(it) = id_token {
+                                                            val["token"]["id_token"] = it.into();
+                                                        }
+                                                        if let Some(rt) = new_rt {
+                                                            val["token"]["refresh_token"] =
+                                                                rt.into();
+                                                        }
+                                                        if let Ok(s) =
+                                                            serde_json::to_string_pretty(&val)
+                                                        {
+                                                            let _ = std::fs::write(&write_path, s);
+                                                        }
                                                     });
                                                 }
                                             }
@@ -1817,10 +1841,19 @@ impl TokenManager {
                                             let pid_clone = pid.clone();
                                             tokio::task::spawn_blocking(move || {
                                                 let Ok(_lk) = crate::modules::account::lock_account_file_updates() else { return; };
-                                                let Ok(raw) = std::fs::read_to_string(&write_path) else { return; };
-                                                let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&raw) else { return; };
+                                                let Ok(raw) = std::fs::read_to_string(&write_path)
+                                                else {
+                                                    return;
+                                                };
+                                                let Ok(mut val) =
+                                                    serde_json::from_str::<serde_json::Value>(&raw)
+                                                else {
+                                                    return;
+                                                };
                                                 val["token"]["project_id"] = pid_clone.into();
-                                                if let Ok(s) = serde_json::to_string_pretty(&val) { let _ = std::fs::write(&write_path, s); }
+                                                if let Ok(s) = serde_json::to_string_pretty(&val) {
+                                                    let _ = std::fs::write(&write_path, s);
+                                                }
                                             });
                                         }
                                         pid
@@ -2208,15 +2241,31 @@ impl TokenManager {
                                     let new_rt = token_response.refresh_token.clone();
                                     let write_ts = now + token_response.expires_in;
                                     tokio::task::spawn_blocking(move || {
-                                        let Ok(_lk) = crate::modules::account::lock_account_file_updates() else { return; };
-                                        let Ok(raw) = std::fs::read_to_string(&write_path) else { return; };
-                                        let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&raw) else { return; };
+                                        let Ok(_lk) =
+                                            crate::modules::account::lock_account_file_updates()
+                                        else {
+                                            return;
+                                        };
+                                        let Ok(raw) = std::fs::read_to_string(&write_path) else {
+                                            return;
+                                        };
+                                        let Ok(mut val) =
+                                            serde_json::from_str::<serde_json::Value>(&raw)
+                                        else {
+                                            return;
+                                        };
                                         val["token"]["access_token"] = access_token.into();
                                         val["token"]["expires_in"] = expires_in.into();
                                         val["token"]["expiry_timestamp"] = write_ts.into();
-                                        if let Some(it) = id_token { val["token"]["id_token"] = it.into(); }
-                                        if let Some(rt) = new_rt { val["token"]["refresh_token"] = rt.into(); }
-                                        if let Ok(s) = serde_json::to_string_pretty(&val) { let _ = std::fs::write(&write_path, s); }
+                                        if let Some(it) = id_token {
+                                            val["token"]["id_token"] = it.into();
+                                        }
+                                        if let Some(rt) = new_rt {
+                                            val["token"]["refresh_token"] = rt.into();
+                                        }
+                                        if let Ok(s) = serde_json::to_string_pretty(&val) {
+                                            let _ = std::fs::write(&write_path, s);
+                                        }
                                     });
                                 }
                             }
@@ -2358,16 +2407,36 @@ impl TokenManager {
                                     }
                                     // [FIX] 写盘后台化：project_id 已写入内存，磁盘持久化不阻塞热路径
                                     {
-                                        let write_path = self.tokens.get(&token.account_id)
+                                        let write_path = self
+                                            .tokens
+                                            .get(&token.account_id)
                                             .map(|e| e.account_path.clone())
-                                            .unwrap_or_else(|| self.data_dir.join("accounts").join(format!("{}.json", token.account_id)));
+                                            .unwrap_or_else(|| {
+                                                self.data_dir
+                                                    .join("accounts")
+                                                    .join(format!("{}.json", token.account_id))
+                                            });
                                         let pid_clone = pid.clone();
                                         tokio::task::spawn_blocking(move || {
-                                            let Ok(_lk) = crate::modules::account::lock_account_file_updates() else { return; };
-                                            let Ok(raw) = std::fs::read_to_string(&write_path) else { return; };
-                                            let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&raw) else { return; };
+                                            let Ok(_lk) =
+                                                crate::modules::account::lock_account_file_updates(
+                                                )
+                                            else {
+                                                return;
+                                            };
+                                            let Ok(raw) = std::fs::read_to_string(&write_path)
+                                            else {
+                                                return;
+                                            };
+                                            let Ok(mut val) =
+                                                serde_json::from_str::<serde_json::Value>(&raw)
+                                            else {
+                                                return;
+                                            };
                                             val["token"]["project_id"] = pid_clone.into();
-                                            if let Ok(s) = serde_json::to_string_pretty(&val) { let _ = std::fs::write(&write_path, s); }
+                                            if let Ok(s) = serde_json::to_string_pretty(&val) {
+                                                let _ = std::fs::write(&write_path, s);
+                                            }
                                         });
                                     }
                                     pid
@@ -2433,7 +2502,8 @@ impl TokenManager {
         update_account_json(&path, move |content| {
             content["disabled"] = serde_json::Value::Bool(true);
             content["disabled_at"] = serde_json::Value::Number(now.into());
-            content["disabled_reason"] = serde_json::Value::String(truncate_reason(&reason_owned, 800));
+            content["disabled_reason"] =
+                serde_json::Value::String(truncate_reason(&reason_owned, 800));
         })
         .await?;
 
@@ -2483,7 +2553,8 @@ impl TokenManager {
         update_account_json(&path, move |content| {
             content["token"]["access_token"] = serde_json::Value::String(access_token);
             content["token"]["expires_in"] = serde_json::Value::Number(expires_in.into());
-            content["token"]["expiry_timestamp"] = serde_json::Value::Number(expiry_timestamp.into());
+            content["token"]["expiry_timestamp"] =
+                serde_json::Value::Number(expiry_timestamp.into());
 
             // 如果获取到了新的 id_token，则保存它
             if let Some(it) = id_token {

@@ -695,8 +695,14 @@ mod tests {
         let full_output = chunks.join("");
 
         // 断言包含标准 Anthropic SSE error event
-        assert!(full_output.starts_with("event: error\n"), "Output should start with 'event: error'");
-        assert!(full_output.contains("data: "), "Output should contain 'data: '");
+        assert!(
+            full_output.starts_with("event: error\n"),
+            "Output should start with 'event: error'"
+        );
+        assert!(
+            full_output.contains("data: "),
+            "Output should contain 'data: '"
+        );
 
         // 提取并解析 data JSON
         let data_line = full_output
@@ -704,13 +710,20 @@ mod tests {
             .find(|l| l.starts_with("data: "))
             .expect("Should have data line");
         let json_str = data_line.strip_prefix("data: ").unwrap().trim();
-        let parsed: serde_json::Value = serde_json::from_str(json_str).expect("data must be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_str).expect("data must be valid JSON");
 
         // 验证 Anthropic error envelope 结构
         assert_eq!(parsed.get("type").and_then(|v| v.as_str()), Some("error"));
         let error_obj = parsed.get("error").expect("Must have 'error' object");
-        assert_eq!(error_obj.get("type").and_then(|v| v.as_str()), Some("api_error"));
-        let message = error_obj.get("message").and_then(|v| v.as_str()).expect("Must have 'message'");
+        assert_eq!(
+            error_obj.get("type").and_then(|v| v.as_str()),
+            Some("api_error")
+        );
+        let message = error_obj
+            .get("message")
+            .and_then(|v| v.as_str())
+            .expect("Must have 'message'");
         assert!(message.contains("upstream connection reset by peer"));
     }
 
@@ -761,12 +774,23 @@ mod tests {
         assert!(full_output.contains("event: error\n"));
 
         // 验证在 event: error 之后绝不能出现 message_stop 或 message_delta
-        let error_pos = full_output.find("event: error\n").expect("Must contain event: error");
+        let error_pos = full_output
+            .find("event: error\n")
+            .expect("Must contain event: error");
         let after_error = &full_output[error_pos..];
 
-        assert!(!after_error.contains("event: message_stop"), "Must not emit message_stop after error");
-        assert!(!after_error.contains("event: message_delta"), "Must not emit message_delta after error");
-        assert!(!after_error.contains("\"type\":\"message_stop\""), "Must not contain message_stop JSON after error");
+        assert!(
+            !after_error.contains("event: message_stop"),
+            "Must not emit message_stop after error"
+        );
+        assert!(
+            !after_error.contains("event: message_delta"),
+            "Must not emit message_delta after error"
+        );
+        assert!(
+            !after_error.contains("\"type\":\"message_stop\""),
+            "Must not contain message_stop JSON after error"
+        );
     }
 
     /// 测试 D: 模拟 OMP iterateAnthropicEvents 客户端解析
@@ -803,7 +827,10 @@ mod tests {
         let mut saw_message_stop = false;
 
         // 简化的 SSE 帧提取器
-        let frames: Vec<&str> = full_output.split("\n\n").filter(|s| !s.trim().is_empty()).collect();
+        let frames: Vec<&str> = full_output
+            .split("\n\n")
+            .filter(|s| !s.trim().is_empty())
+            .collect();
         for frame in frames {
             let mut event_name: Option<&str> = None;
             let mut data_str: Option<&str> = None;
@@ -821,7 +848,10 @@ mod tests {
             if event_name == Some("error") {
                 if let Some(data) = data_str {
                     let parsed: serde_json::Value = serde_json::from_str(data).unwrap();
-                    let msg = parsed.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str());
+                    let msg = parsed
+                        .get("error")
+                        .and_then(|e| e.get("message"))
+                        .and_then(|m| m.as_str());
                     caught_omp_error = msg.map(|s| s.to_string());
                 }
             } else if event_name == Some("message_stop") {
@@ -830,8 +860,14 @@ mod tests {
         }
 
         // 验证 OMP 能够识别出错误，且没有收到 message_stop
-        assert!(caught_omp_error.is_some(), "OMP parser should have caught the stream error");
+        assert!(
+            caught_omp_error.is_some(),
+            "OMP parser should have caught the stream error"
+        );
         assert!(caught_omp_error.unwrap().contains("upstream timeout"));
-        assert!(!saw_message_stop, "OMP parser should not see message_stop on stream failure");
+        assert!(
+            !saw_message_stop,
+            "OMP parser should not see message_stop on stream failure"
+        );
     }
 }

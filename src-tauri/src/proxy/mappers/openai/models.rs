@@ -128,7 +128,12 @@ pub struct OpenAIInputAudio {
     /// base64 编码的音频数据 (也兼容传入 data: URL)
     pub data: String,
     /// "wav" | "mp3" | "m4a" | "ogg" | "flac" | "aiff" ... 亦接受完整 MIME
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "mimeType", alias = "mime_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "mimeType",
+        alias = "mime_type"
+    )]
     pub format: Option<String>,
 }
 

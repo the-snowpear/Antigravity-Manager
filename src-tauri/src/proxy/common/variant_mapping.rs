@@ -275,11 +275,17 @@ pub static GEMINI_FAMILIES: &[CanonicalFamily] = &[
         ],
         aliases: &[
             ("gemini-3.7-flash-high", AliasPolicy::HonorTier),
-            ("gemini-3.7-flash-medium", AliasPolicy::Fixed(VariantTier::Medium)),
+            (
+                "gemini-3.7-flash-medium",
+                AliasPolicy::Fixed(VariantTier::Medium),
+            ),
             ("gemini-3.7-flash-low", AliasPolicy::Fixed(VariantTier::Low)),
             ("gemini-3.7-flash-tiered", AliasPolicy::HonorTier),
             ("gemini-3.6-flash-high", AliasPolicy::HonorTier),
-            ("gemini-3.6-flash-medium", AliasPolicy::Fixed(VariantTier::Medium)),
+            (
+                "gemini-3.6-flash-medium",
+                AliasPolicy::Fixed(VariantTier::Medium),
+            ),
             ("gemini-3.6-flash-low", AliasPolicy::Fixed(VariantTier::Low)),
             ("gemini-3.6-flash", AliasPolicy::HonorTier),
             ("gemini-3.6-flash-tiered", AliasPolicy::HonorTier),
